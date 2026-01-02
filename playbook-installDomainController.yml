@@ -1,17 +1,25 @@
-- name: Install and configure an Active Directory domain controller
+---
+- name: Install and promote domain controller(s)
   hosts: domctls
+  gather_facts: no
+  collections:
+    - ansible.windows
   
   tasks:
     - name: Install ADDS role and management tools
-      ansible.windows.win_feature:
+      win_feature:
         name: AD-Domain-Services
         state: present
         include_management_tools: true
+      register: feature_install
+
+    - name: Reboot after feature installation if required
+      win_reboot:
+      when: feature_install.reboot_required
     
-    - name: Run post-installation config script
-      ansible.windows.win_powershell:
+    - name: Promote first domain controller and create forest
+      win_powershell:
         script: |
-          Import-Module ADDSDeployment
           $domainParams = @{
             DomainName = 'example.com'
             DomainNetbiosName = 'EXAMPLE'
@@ -23,5 +31,10 @@
           }
           $DSRMpassword = ConvertTo-SecureString 'Ex@mpledotcom!!!123' -AsPlainText -Force
           Install-ADDSForest @domainParams -SafeModeAdministratorPassword $DSRMpassword
+      when: inventory_hostname == groups['domctls'][0]
 
-      
+    - name: Join domain and promote additional domain controller(s)
+      win_powershell:
+        script: |
+          Add-Computer -DomainName "{{ domain_name }}" -Restart
+      register: domain_join
