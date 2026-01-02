@@ -1,0 +1,27 @@
+- name: Install and configure an Active Directory domain controller
+  hosts: domctl
+  
+  tasks:
+    - name: Install ADDS role and management tools
+      ansible.windows.win_feature:
+        name: AD-Domain-Services
+        state: present
+        include_management_tools: true
+    
+    - name: Run post-installation config script
+      ansible.windows.win_powershell:
+        script: |
+          Import-Module ADDSDeployment
+          $domainParams = @{
+            DomainName = ''
+            DomainNetbiosName = ''
+            ForestMode = 'Win2025'
+            DomainMode = 'Win2025'
+            CreateDnsDelegation = $false
+            InstallDns = $true
+            Force = $true
+          }
+          $DSRMpassword = ConvertTo-SecureString '' -AsPlainText -Force
+          Install-ADDSForest @domainParams -SafeModeAdministratorPassword $DSRMpassword
+
+      
