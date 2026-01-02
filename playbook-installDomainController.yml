@@ -1,5 +1,5 @@
 - name: Install and configure an Active Directory domain controller
-  hosts: domctl
+  hosts: domctls
   
   tasks:
     - name: Install ADDS role and management tools
@@ -13,15 +13,15 @@
         script: |
           Import-Module ADDSDeployment
           $domainParams = @{
-            DomainName = ''
-            DomainNetbiosName = ''
+            DomainName = 'example.com'
+            DomainNetbiosName = 'EXAMPLE'
             ForestMode = 'Win2025'
             DomainMode = 'Win2025'
             CreateDnsDelegation = $false
             InstallDns = $true
             Force = $true
           }
-          $DSRMpassword = ConvertTo-SecureString '' -AsPlainText -Force
+          $DSRMpassword = ConvertTo-SecureString 'Ex@mpledotcom!!!123' -AsPlainText -Force
           Install-ADDSForest @domainParams -SafeModeAdministratorPassword $DSRMpassword
 
       
