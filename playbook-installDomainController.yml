@@ -38,7 +38,7 @@
     - name: Join domain for additional domain controller(s)
       win_powershell:
         script: |
-          Add-Computer -DomainName "{{ domain_name }}" -Restart
+          Add-Computer -DomainName "example.com" -Restart
 
     #- name: Promote additional domain controller(s)
     #  win_powershell:
