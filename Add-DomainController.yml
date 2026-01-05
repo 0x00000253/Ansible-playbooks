@@ -5,22 +5,41 @@
   collections:
     - ansible.windows
 
-  
-  tasks:
-    - name: Join domain
-      win_powershell:
-        script: |
-          Add-Computer -DomainName "{{ domain_name }}" -Restart -Force
-      when: inventory_hostname != groups['domctls'][0]
 
+  tasks:
     - name: Install ADDS role and management tools
       win_feature:
         name: AD-Domain-Services
         state: present
         include_management_tools: true
-      register: feature_install
-    
+
+    - name: Set primary DNS to domain controller
+      ansible.windows.win_dns_client:
+        adapter_names: Ethernet0
+        dns_servers: 192.168.1.201
+      when: inventory_hostname != groups['domctls'][0]
+
+    - name: Join domain
+      microsoft.ad.membership:
+        dns_domain_name: "{{ domain_name }}"
+        domain_admin_user: Administrator@example.com
+        domain_admin_password: P@ssw0rd
+        state: domain
+        reboot: true
+      when: inventory_hostname != groups['domctls'][0]
+
     - name: Promote domain controller
       win_powershell:
         script: |
+          $domainParams = @{
+            DomainName = 'example.com'
+            InstallDns = $true
+            CreateDnsDelegation = $false
+            NoRebootOnCompletion = $false
+            Force = $true
+          }
+          $password = ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force
+          $credential = New-Object System.Management.Automation.PSCredential("EXAMPLE\Administrator", $password)
+          $DSRMpassword = ConvertTo-SecureString 'Ex@mpledotcom!!!123' -AsPlainText -Force
+          Install-ADDSDomainController @domainParams -SafeModeAdministratorPassword $DSRMPassword -Credential $credential
       when: inventory_hostname != groups['domctls'][0]
