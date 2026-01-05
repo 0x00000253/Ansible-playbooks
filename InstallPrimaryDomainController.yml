@@ -1,8 +1,7 @@
 ---
-- name: Install and promote domain controller(s)
+- name: Install and promote the first domain controller
   hosts: domctls
   gather_facts: no
-  serial: 1
   collections:
     - ansible.windows
 
@@ -14,10 +13,6 @@
         state: present
         include_management_tools: true
       register: feature_install
-
-    - name: Reboot after feature installation if required
-      win_reboot:
-      when: feature_install.reboot_required
     
     - name: Promote first domain controller and create forest
       win_powershell:
@@ -34,17 +29,3 @@
           $DSRMpassword = ConvertTo-SecureString 'Ex@mpledotcom!!!123' -AsPlainText -Force
           Install-ADDSForest @domainParams -SafeModeAdministratorPassword $DSRMpassword
       when: inventory_hostname == groups['domctls'][0]
-
-    - name: Check if the Kerberos port is open
-      wait_for:
-        host: 192.168.1.201
-        port: 88
-        delay: 300
-      register: port_status
-
-
-    - name: Join domain
-      microsoft.ad.membership:
-        dns_domain_name: example.com
-        state: domain
-        reboot: true
