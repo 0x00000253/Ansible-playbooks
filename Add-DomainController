@@ -1,0 +1,26 @@
+---
+- name: Set up additional domain controller(s)
+  hosts: domctls
+  gather_facts: no
+  collections:
+    - ansible.windows
+
+  
+  tasks:
+    - name: Join domain
+      win_powershell:
+        script: |
+          Add-Computer -DomainName "{{ domain_name }}" -Restart -Force
+      when: inventory_hostname != groups['domctls'][0]
+
+    - name: Install ADDS role and management tools
+      win_feature:
+        name: AD-Domain-Services
+        state: present
+        include_management_tools: true
+      register: feature_install
+    
+    - name: Promote domain controller
+      win_powershell:
+        script: |
+      when: inventory_hostname != groups['domctls'][0]
