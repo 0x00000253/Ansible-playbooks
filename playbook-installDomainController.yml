@@ -35,12 +35,16 @@
           Install-ADDSForest @domainParams -SafeModeAdministratorPassword $DSRMpassword
       when: inventory_hostname == groups['domctls'][0]
 
-    - name: Join domain for additional domain controller(s)
-      win_powershell:
-        script: |
-          Add-Computer -DomainName "example.com" -Restart
+    - name: Check if the Kerberos port is open
+      wait_for:
+        host: 192.168.1.201
+        port: 88
+        delay: 300
+      register: port_status
 
-    #- name: Promote additional domain controller(s)
-    #  win_powershell:
-    #    script: |
-    #  when: inventory_hostname != groups['domctls'][0]
+
+    - name: Join domain
+      microsoft.ad.membership:
+        dns_domain_name: example.com
+        state: domain
+        reboot: true
