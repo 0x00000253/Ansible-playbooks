@@ -10,7 +10,7 @@
     - name: Retrieve OU structure
       win_powershell:
         script: |
-          Get-ADOrganizationalUnit -Filter * -SearchBase "DC=example,DC=com" -SearchScope OneLEvel | Select-Object DistinguishedName | ConvertTo-JSON
+          Get-ADOrganizationalUnit -Filter * | Select-Object DistinguishedName | ConvertTo-JSON
       register: script_output
       when: inventory_hostname == groups['domctls'][0]
       
