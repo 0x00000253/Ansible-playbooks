@@ -1,0 +1,19 @@
+---
+- name: Get Active Directory top level Organizational Units
+  hosts: domctls
+  gather_facts: no
+  collections:
+    - ansible.windows
+
+  
+  tasks:
+    - name: Retrieve OU structure
+      win_powershell:
+        script: |
+          Get-ADOrganizationalUnit -Filter * -SearchBase "DC=example,DC=com" -SearchScope OneLEvel | Select-Object DistinguishedName
+      when: inventory_hostname == groups['domctls'][0]
+      register: script_output
+
+    - name: Show output
+      debug:
+        var: script_output
