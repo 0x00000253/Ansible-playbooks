@@ -1,0 +1,29 @@
+---
+- name: DNS management
+  hosts: domaincontrollers
+  gather_facts: no
+
+  tasks:
+  - name: create A record
+    ansible.windows.win_dns_record:
+      name: "ansible"
+      type: "A"
+      value: "10.0.0.1"
+      zone: "homelab.local"
+      computer_name: "homelab.local"
+
+  - name: create CNAME record
+    ansible.windows.win_dns_record:
+      name: "aliasForAnsible"
+      type: "CNAME"
+      value: "ansible.homelab.local"
+      zone: "homelab.local"
+      computer_name: "homelab.local"
+
+  - name: remove record
+    ansible.windows.win_dns_record:
+      name: "example"
+      type: "A"
+      zone: "homelab.local"
+      computer_name: "homelab.local"
+      state: absent
