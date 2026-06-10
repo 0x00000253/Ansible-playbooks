@@ -1,0 +1,10 @@
+---
+- name: Install Notepadplusplus
+  hosts: domaincontrollers
+  gather_facts: no
+
+  tasks:
+    - name: Install software
+      ansible.windows.win_package:
+        path: C:\sources\npp.8.9.3.Installer.x64.msi
+        state: present
