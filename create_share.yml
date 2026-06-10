@@ -1,0 +1,56 @@
+---
+- name: Create AD groups for share
+  hosts: domaincontrollers
+  gather_facts: no
+
+  tasks:
+    - name: Create read only group
+      microsoft.ad.group:
+        name: "DFR_{{ share_name }}"
+        scope: domainlocal
+        category: security
+        path: OU=Groups,DC=homelab,DC=local
+
+    - name: Create read write group
+      microsoft.ad.group:
+        name: "DFC_{{ share_name }}"
+        scope: domainlocal
+        category: security
+        path: OU=Groups,DC=homelab,DC=local
+
+- name: Create share and link access groups
+  hosts: steppingstone
+  gather_facts: no
+  collections:
+    - ansible.windows
+
+  tasks:
+    - name: Create folder
+      win_file:
+        path: "{{ folder_path }}"
+        state: directory
+
+    - name: Share the folder
+      win_share:
+        name: "{{ share_name }}"
+        path: "{{ folder_path }}"
+        change: Authenticated Users
+        list: true
+
+    - name: Add NTFS permissions for read only
+      win_acl:
+        path: "{{ folder_path }}"
+        user: "HOMELAB\\DFR_{{ share_name }}" # param 'user' is used for groups as well
+        rights: ReadAndExecute
+        type: allow
+        inherit: ContainerInherit, ObjectInherit
+        state: present
+
+    - name: Add NTFS permissions for read write
+      win_acl:
+        path: "{{ folder_path }}"
+        user: "HOMELAB\\DFC_{{ share_name }}"
+        rights: Modify
+        type: allow
+        inherit: ContainerInherit, ObjectInherit
+        state: present
