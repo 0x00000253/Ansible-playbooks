@@ -1,0 +1,50 @@
+---
+- name: Apply local group policy with LGPO.exe
+  hosts: all
+  gather_facts: false
+
+  vars:
+    # Paths on the Ansible controller, relative to this playbook
+    lgpo_exe_src: files/lgpo/LGPO.exe
+    lgpo_backup_src: files/lgpo/backup/ # folder containing the {GUID} backup folder(s)
+    # Paths on the Windows host
+    lgpo_work_dir: C:\sources\lgpo
+    # Set to true (-e lgpo_force=true) to re-apply even when the export has not changed
+    lgpo_force: false
+
+  tasks:
+    - name: Create working folders
+      ansible.windows.win_file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ lgpo_work_dir }}"
+        - "{{ lgpo_work_dir }}\\backup"
+
+    - name: Copy LGPO.exe
+      ansible.windows.win_copy:
+        src: "{{ lgpo_exe_src }}"
+        dest: "{{ lgpo_work_dir }}\\LGPO.exe"
+
+    - name: Copy policy export
+      ansible.windows.win_copy:
+        src: "{{ lgpo_backup_src }}"
+        dest: "{{ lgpo_work_dir }}\\backup\\"
+      register: lgpo_backup_copy
+
+    - name: Import policy export into local policy
+      ansible.windows.win_command:
+        cmd: LGPO.exe /g "{{ lgpo_work_dir }}\backup" /v
+        chdir: "{{ lgpo_work_dir }}"
+      register: lgpo_import
+      when: lgpo_backup_copy is changed or lgpo_force | bool
+
+    - name: Refresh policy
+      ansible.windows.win_command:
+        cmd: gpupdate.exe /force
+      when: lgpo_import is changed
+
+    - name: Show LGPO output
+      ansible.builtin.debug:
+        var: lgpo_import.stdout_lines
+      when: lgpo_import is changed
