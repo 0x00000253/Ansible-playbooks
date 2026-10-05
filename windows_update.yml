@@ -1,0 +1,81 @@
+---
+- name: Install Windows Server patches (.msu)
+  hosts: all
+  gather_facts: false
+  serial: 1 # one host at a time, so hosts never reboot together
+
+  vars:
+    # Share holding the .msu files
+    patch_source_dir: \\steppingstone\patches
+    # Account that can read the share; needed because WinRM cannot pass credentials on to a second host
+    patch_share_user: "{{ ansible_user }}"
+    patch_share_password: "{{ ansible_password }}"
+    # Local folder on each host
+    patch_work_dir: C:\sources\patches
+    # Set to false (-e patch_reboot=false) to install without ever rebooting
+    patch_reboot: true
+    patch_reboot_timeout: 3600
+
+  tasks:
+    - name: Find patches on the share
+      ansible.windows.win_find:
+        paths: "{{ patch_source_dir }}"
+        patterns: "*.msu"
+      register: patch_files
+      become: true
+      become_method: ansible.builtin.runas
+      become_user: "{{ patch_share_user }}"
+      vars:
+        ansible_become_password: "{{ patch_share_password }}"
+
+    - name: Stop when there is nothing to install
+      ansible.builtin.assert:
+        that: patch_files.files | length > 0
+        fail_msg: "No .msu files found in {{ patch_source_dir }}"
+
+    - name: Create local patch folder
+      ansible.windows.win_file:
+        path: "{{ patch_work_dir }}"
+        state: directory
+
+    - name: Copy patches to the host
+      ansible.windows.win_copy:
+        src: "{{ item.path }}"
+        dest: "{{ patch_work_dir }}\\{{ item.filename }}"
+        remote_src: true
+      loop: "{{ patch_files.files | sort(attribute='filename') }}"
+      loop_control:
+        label: "{{ item.filename }}"
+      become: true
+      become_method: ansible.builtin.runas
+      become_user: "{{ patch_share_user }}"
+      vars:
+        ansible_become_password: "{{ patch_share_password }}"
+
+    - name: Check for a reboot left pending by earlier servicing
+      ansible.windows.win_powershell:
+        script: |
+          $Ansible.Changed = $false
+          (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') -or
+          (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired')
+      register: patch_pending_reboot
+
+    - name: Reboot before patching when one is pending
+      ansible.windows.win_reboot:
+        reboot_timeout: "{{ patch_reboot_timeout }}"
+      when:
+        - patch_reboot | bool
+        - patch_pending_reboot.output[0] | bool
+
+    # Each patch is installed and, if it asks for one, followed by a reboot before the next patch starts
+    - name: Install patches one by one
+      ansible.builtin.include_tasks: tasks/install_patch.yml
+      loop: "{{ patch_files.files | sort(attribute='filename') }}"
+      loop_control:
+        loop_var: patch
+        label: "{{ patch.filename }}"
+
+    - name: Warn when a reboot is still outstanding
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} still needs a reboot to finish installing its patches"
+      when: patch_reboot_outstanding | default(false)
